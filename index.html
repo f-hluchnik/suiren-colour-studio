@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Suiren colour studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --mist: #E4E8E5;      /* pond mist: page + 3D backdrop */
+    --paper: #EEF1EE;     /* raised surfaces */
+    --ink: #1D2420;       /* text */
+    --reed: #5C6660;      /* secondary text */
+    --hair: #C8CEC9;      /* hairlines, outlines */
+    --display: 'Bricolage Grotesque', 'Zen Kaku Gothic New', system-ui, sans-serif;
+    --body: 'Zen Kaku Gothic New', 'Hiragino Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--mist);
+    color: var(--ink);
+    font: 400 15px/1.55 var(--body);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+  .app {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 400px;
+    height: 100%;
+  }
+
+  /* ---------- stage ---------- */
+  .stage { position: relative; min-height: 0; overflow: hidden; }
+  .stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .stage canvas.over-rib { cursor: pointer; }
+
+  .mark {
+    position: absolute; top: 32px; left: 36px;
+    display: flex; gap: 14px; align-items: flex-start;
+    pointer-events: none;
+  }
+  .kanji {
+    writing-mode: vertical-rl;
+    font: 500 44px/1 var(--body);
+    letter-spacing: 0.12em;
+    margin: 0;
+  }
+  .mark p { margin: 2px 0 0; font-size: 13px; line-height: 1.5; color: var(--reed); max-width: 14ch; }
+
+  .caption {
+    position: absolute; left: 36px; right: 36px; bottom: 32px;
+    pointer-events: none;
+  }
+  .caption h1 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(40px, 5.4vw, 76px);
+    line-height: 0.95;
+    letter-spacing: -0.025em;
+    font-variation-settings: 'opsz' 96;
+    margin: 0 0 14px;
+    max-width: 12ch;
+  }
+  .caption p { margin: 0; color: var(--reed); font-size: 14px; max-width: 46ch; }
+  .caption h1 {
+    pointer-events: auto; cursor: text; outline: none;
+    text-decoration: underline 2px transparent; text-underline-offset: 0.12em;
+    transition: text-decoration-color 0.2s ease; caret-color: currentColor;
+    overflow-wrap: anywhere;
+  }
+  .caption h1:hover, .caption h1:focus { text-decoration-color: var(--hair); text-decoration-style: dashed; }
+  .caption h1:focus { text-decoration-style: solid; text-decoration-color: var(--ink); }
+  .caption .rename { display: inline; }
+
+  /* ---------- panel ---------- */
+  .panel {
+    overflow-y: auto;
+    padding: 32px 32px 40px;
+    background: var(--paper);
+    border-left: 1px solid var(--hair);
+  }
+  .panel section + section { margin-top: 36px; }
+  .panel h2 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 19px;
+    letter-spacing: -0.01em;
+    margin: 0 0 4px;
+  }
+  .hint { margin: 0 0 16px; color: var(--reed); font-size: 13.5px; }
+
+  /* dial */
+  .dial-wrap { display: grid; place-items: center; margin: 4px 0 22px; }
+  .dial { width: 248px; height: 248px; overflow: visible; }
+  .dial .rot { transition: transform 0.12s linear; }
+  .dial .petal {
+    mix-blend-mode: multiply;
+    stroke-width: 1.4;
+    cursor: pointer;
+    transition: transform 0.18s ease, fill 0.25s ease, stroke 0.25s ease;
+  }
+  .dial .petal.hot { transform: translateY(7px); }
+  .dial .front { font: 500 11px var(--body); fill: var(--reed); }
+  .dial .ring-dot { transition: fill 0.25s ease; }
+  .status { text-align: center; min-height: 1.5em; font-size: 14px; margin: 0 0 18px; }
+  .status b { font-weight: 700; }
+
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .swatch {
+    width: 34px; height: 34px; padding: 0;
+    border: none; border-radius: 50%;
+    background: var(--c);
+    box-shadow: inset 0 -6px 10px rgba(0,0,0,0.18), inset 0 5px 8px rgba(255,255,255,0.45);
+    position: relative;
+  }
+  .swatch[aria-pressed="true"]::after {
+    content: ''; position: absolute; inset: -5px;
+    border: 2px solid var(--ink); border-radius: 50%;
+  }
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .chip {
+    border: 1px solid var(--hair); background: transparent;
+    border-radius: 999px; padding: 7px 14px; font-size: 13.5px;
+  }
+  .chip:hover { background: var(--mist); }
+
+  /* colourways */
+  .ways { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 8px; }
+  .way {
+    border: none; background: transparent; padding: 8px 4px 6px; border-radius: 14px;
+    display: grid; justify-items: center; gap: 6px; font-size: 12.5px; line-height: 1.3; text-align: center;
+  }
+  .way:hover { background: var(--mist); }
+  .way[aria-pressed="true"] { background: var(--mist); box-shadow: inset 0 0 0 1px var(--hair); }
+  .way svg { width: 58px; height: 58px; }
+  .way svg path { mix-blend-mode: multiply; }
+
+  /* ring finish */
+  .seg { display: inline-flex; border: 1px solid var(--hair); border-radius: 999px; padding: 3px; }
+  .seg button {
+    border: none; background: transparent; border-radius: 999px; padding: 7px 16px;
+    display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px;
+  }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .seg i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 1px rgba(0,0,0,0.25); }
+
+  /* order list */
+  .order { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .order td { padding: 7px 0; vertical-align: middle; }
+  .order tr + tr td { border-top: 1px solid var(--hair); }
+  .order .dot { width: 22px; }
+  .order .dot i { width: 12px; height: 12px; border-radius: 50%; display: block; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2); }
+  .order .num { text-align: right; white-space: nowrap; }
+  .order small { display: block; color: var(--reed); font-size: 12px; }
+  .total { margin: 12px 0 0; color: var(--reed); font-size: 13px; }
+
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .primary {
+    border: none; background: var(--ink); color: var(--paper);
+    border-radius: 999px; padding: 11px 20px; font-weight: 500; font-size: 14px;
+  }
+  .primary:hover { background: #2f3933; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 12px);
+    background: var(--ink); color: var(--paper); border-radius: 999px;
+    padding: 9px 18px; font-size: 13.5px; opacity: 0; pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    margin-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  .noscript-msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--reed); padding: 24px; text-align: center; }
+
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: 62vh auto; height: auto; }
+    html, body { height: auto; }
+    .stage { height: 62vh; }
+    .panel { border-left: none; border-top: 1px solid var(--hair); overflow: visible; padding: 28px 22px 48px; }
+    .mark { top: 20px; left: 20px; }
+    .kanji { font-size: 32px; }
+    .caption { left: 20px; right: 20px; bottom: 18px; }
+    .caption p .more { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <main class="stage" id="stage">
+    <div class="mark">
+      <p class="kanji" lang="ja">睡蓮</p>
+      <p>Suiren is Japanese for water lily</p>
+    </div>
+    <div class="caption">
+      <h1 id="wayName" contenteditable="true" spellcheck="false" role="textbox" aria-label="Colourway name" title="Rename your colourway">Rainbow</h1>
+      <p>Tap the name to rename your design.<span class="more"> Drag to turn the dripper, scroll to zoom, tap a rib to paint it.</span></p>
+    </div>
+    <noscript><div class="noscript-msg">Turn on JavaScript to see the 3D dripper.</div></noscript>
+  </main>
+
+  <aside class="panel" aria-label="Colour controls">
+    <section>
+      <h2>Paint the ribs</h2>
+      <p class="hint">Pick a colour, then tap a rib on the dial or on the dripper.</p>
+      <div class="dial-wrap">
+        <svg class="dial" id="dial" viewBox="-140 -140 280 280" role="group" aria-label="Ribs seen from above"></svg>
+      </div>
+      <p class="status" id="status" aria-live="polite"></p>
+      <div class="swatches" id="swatches" role="group" aria-label="Rib colours"></div>
+      <div class="tools">
+        <button class="chip" id="fillAll">Fill all ribs</button>
+        <button class="chip" id="alternate">Alternate with brush</button>
+        <button class="chip" id="shuffle">Shuffle</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Colourways</h2>
+      <p class="hint">Starting points you can paint over.</p>
+      <div class="ways" id="ways"></div>
+    </section>
+
+    <section>
+      <h2>Ring and holder</h2>
+      <p class="hint">The ring holds the ribs; the holder sits on your mug.</p>
+      <div class="seg" id="ringSeg" role="group" aria-label="Ring colour"></div>
+    </section>
+
+    <section>
+      <h2>What to order</h2>
+      <p class="hint">Ribs are sold in sets of six.</p>
+      <table class="order"><tbody id="order"></tbody></table>
+      <p class="total" id="total"></p>
+    </section>
+
+    <section>
+      <div class="actions">
+        <button class="primary" id="saveImg">Save image</button>
+        <button class="chip" id="copyLink">Copy link</button>
+        <button class="chip" id="resetView">Reset view</button>
+      </div>
+    </section>
+  </aside>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* ============================================================================
+   Product data
+   ========================================================================== */
+// tint = light one 2 mm layer of resin lets through (sRGB). scatter = milky internal glow.
+// edge = how much darker the moulded edges read (light travels the rib's width there).
+// Tuned against Hario's Rainbow, Black and Tricolor photos.
+const COLORS = [
+  { id: 'TR',  name: 'Clear Red',    hex: '#E5401E', tint: [0.97, 0.20, 0.05], scatter: 0.04, edge: 3.0, code: 'RIB-6-TR' },
+  { id: 'TPR', name: 'Clear Pink',   hex: '#F07AAE', tint: [0.98, 0.48, 0.68], scatter: 0.04, edge: 3.0, code: 'RIB-6-TPR' },
+  { id: 'TY',  name: 'Clear Yellow', hex: '#F4C61C', tint: [0.99, 0.84, 0.14], scatter: 0.05, edge: 3.0, code: 'RIB-6-TY' },
+  { id: 'TG',  name: 'Clear Green',  hex: '#1DAA4E', tint: [0.12, 0.72, 0.30], scatter: 0.04, edge: 3.0, code: 'RIB-6-TG' },
+  { id: 'TBU', name: 'Clear Blue',   hex: '#1F78E8', tint: [0.08, 0.52, 0.98], scatter: 0.04, edge: 3.2, code: 'RIB-6-TBU' },
+  { id: 'TPU', name: 'Clear Purple', hex: '#9A3FE0', tint: [0.64, 0.24, 0.94], scatter: 0.04, edge: 3.0, code: 'RIB-6-TPU' },
+  { id: 'TW',  name: 'Clear White',  hex: '#E9EAEC', tint: [0.80, 0.81, 0.83], scatter: 0.30, edge: 1.4, code: 'RIB-6-TW' },
+  { id: 'TBK', name: 'Clear Black',  hex: '#55585C', tint: [0.40, 0.41, 0.43], scatter: 0.02, edge: 3.4, code: '' },
+];
+const BY_ID = Object.fromEntries(COLORS.map(c => [c.id, c]));
+const RINGS = {
+  black: { label: 'Black', ring: 0x1b1b1d, holder: 0x222225, swatch: '#2a2a2d' },
+  white: { label: 'White', ring: 0xf2f2f0, holder: 0xf4f4f2, swatch: '#f0f0ee' },
+};
+const N = 12;
+const pattern = (ids) => Array.from({ length: N }, (_, i) => ids[i % ids.length]);
+// Rib 1 faces the front; numbers run to the right. Official sets carry their ring colour.
+const WAYS = [
+  { name: 'Rainbow', ring: 'white', ribs: ['TR','TW','TW','TY','TY','TG','TG','TBU','TBU','TPU','TPU','TR'] },
+  { name: 'Tricolor', ring: 'black', ribs: ['TBU','TBU','TR','TR','TR','TR','TW','TW','TW','TW','TBU','TBU'] },
+  { name: 'Black', ring: 'black', ribs: pattern(['TBK']) },
+  { name: 'Red, Blue & White', ring: 'black', ribs: ['TR','TBU','TR','TBU','TR','TW','TW','TW','TW','TBU','TR','TBU'] },
+  { name: 'Clear Yellow', ribs: pattern(['TY']) },
+  { name: 'Clear White', ribs: pattern(['TW']) },
+  { name: 'Lagoon', ribs: pattern(['TG', 'TBU']) },
+  { name: 'Peony', ribs: pattern(['TPR', 'TPU']) },
+  { name: 'Sunset', ribs: ['TY','TY','TY','TPR','TPR','TPR','TR','TR','TR','TPU','TPU','TPU'] },
+];
+const wayMatches = w => w.ribs.join() === state.ribs.join() && (!w.ring || w.ring === state.ring);
+
+/* ============================================================================
+   State (+ shareable link)
+   ========================================================================== */
+const DEFAULT_NAME = 'Untitled colourway';
+const state = { ribs: WAYS[0].ribs.slice(), brush: 'TR', ring: WAYS[0].ring, name: WAYS[0].name, customName: false, hover: -1 };
+(function readHash() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  const r = (p.get('ribs') || '').split('.');
+  if (r.length === N && r.every(id => BY_ID[id])) state.ribs = r;
+  if (RINGS[p.get('ring')]) state.ring = p.get('ring');
+  const nm = (p.get('name') || '').trim().slice(0, 48);
+  if (nm) { state.name = nm; state.customName = !WAYS.some(w => w.name === nm); }
+  else if (p.get('ribs')) { const m = WAYS.find(wayMatches); state.name = m ? m.name : 'Your colourway'; }
+})();
+function writeHash() {
+  const q = new URLSearchParams({ ribs: state.ribs.join('.'), ring: state.ring, name: state.name });
+  try { history.replaceState(null, '', '#' + q.toString()); } catch (e) {}
+}
+
+/* ============================================================================
+   Rib geometry. 12 identical, flat PCT resin ribs (24 x 18 x 115 mm). Each one's
+   outline is traced from Hario's photo; the fork clips onto the ring, the straight
+   inner edge leans out with the ring's cone, and outside the ring the rib bends
+   gently round a vertical axis, which makes the spiral you see from above.
+   ========================================================================== */
+// Suiren rib, traced from Hario's product shot of a single rib (mm, 115 x 24).
+// y runs along the rib from the base; x runs across it from the inner (filter) edge.
+const RIB = {
+  L: 115, T: 2.4,          // length, thickness (mm)
+  LEAN: 30,                // inner edge leans out 30° (matches the ring cone)
+  BASE_R: 0.6, BASE_H: 1.0, // where the inner edge starts (cm), inside the ring
+  BEND_R0: 2.4, BEND_K: 0.26, // outside the ring the rib bends round a vertical axis (cm):
+                             // seen from above each rib is a curved arc, as in the pinwheel shot
+  SLOT_X0: 7.0, SLOT_X1: 10.6, SLOT_Y: 16, // the fork that clips onto the ring
+};
+// [y, inner x, outer x]
+const PROFILE = [
+  [0, 1.5, 18.5], [1, 0.6, 19.5], [3.3, 0.4, 19.8], [7.6, 0.4, 19.9], [12, 0.4, 20.7], [16.4, 0.4, 21.4],
+  [20.7, 0.4, 22.3], [25.1, 0.2, 22.9], [29.5, 0.2, 23.6], [33.8, 0.2, 24.0], [38.2, 0.2, 24.4], [42.5, 0.2, 24.5],
+  [46.9, 0.2, 24.5], [51.3, 0, 24.2], [55.7, 0, 23.6], [60, 0, 22.9], [64.4, 0, 22.1], [68.8, -0.2, 21.2],
+  [73.1, -0.4, 19.9], [77.5, -0.7, 18.3], [81.9, -0.9, 16.6], [86.2, -1.3, 14.6], [90.6, -1.7, 12.7],
+  [95, -2.2, 10.3], [99.3, -2.8, 7.9], [103.7, -3.7, 5.2], [108, -4.6, 2.4], [112.4, -5.9, -0.7], [115, -6.6, -6.2],
+];
+function profileAt(y) {
+  let i = 0;
+  while (i < PROFILE.length - 2 && PROFILE[i + 1][0] < y) i++;
+  const [y0, a0, b0] = PROFILE[i], [y1, a1, b1] = PROFILE[i + 1];
+  const t = Math.min(1, Math.max(0, (y - y0) / (y1 - y0)));
+  return [a0 + (a1 - a0) * t, b0 + (b1 - b0) * t];
+}
+function smooth01(e0, e1, x) { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); }
+const D2R = Math.PI / 180;
+
+// local (mm) -> world (cm) for the rib at angle 0; side = +1 / -1 picks the face.
+// World: x = tangential, y = up, z = radial.
+function ribToWorld(x, y, side) {
+  const l = RIB.LEAN * D2R, c = Math.cos(l), s = Math.sin(l);
+  const H = RIB.BASE_H + (y * c - x * s) / 10;
+  const R = RIB.BASE_R + (y * s + x * c) / 10;
+  const d = Math.max(0, R - RIB.BEND_R0);
+  const bend = RIB.BEND_K * d * d, slope = 2 * RIB.BEND_K * d;
+  const nl = Math.hypot(1, slope);
+  const off = side * RIB.T / 20;                       // half thickness, cm
+  return [bend + off / nl, H, R - off * slope / nl];
+}
+
+function buildRibArrays() {
+  const pos = [], edge = [], idx = [];
+  const add = (v, e) => { pos.push(v[0], v[1], v[2]); edge.push(e); return pos.length / 3 - 1; };
+  const quad = (a, b, c, d) => idx.push(a, b, c, a, c, d);
+
+  // a patch is a grid of local points: rows (y), columns spanning [xa(y), xb(y)]
+  function patch(ys, xa, xb, nc) {
+    return ys.map(y => { const a = xa(y), b = xb(y); return Array.from({ length: nc + 1 }, (_, j) => [a + (b - a) * j / nc, y]); });
+  }
+  function faces(P) {
+    for (const side of [1, -1]) {
+      const id = P.map(row => row.map(([x, y]) => add(ribToWorld(x, y, side), 0)));
+      for (let i = 0; i < P.length - 1; i++) for (let j = 0; j < P[0].length - 1; j++) {
+        if (side > 0) quad(id[i][j], id[i + 1][j], id[i + 1][j + 1], id[i][j + 1]);
+        else quad(id[i][j], id[i][j + 1], id[i + 1][j + 1], id[i + 1][j]);
+      }
+    }
+  }
+  // side wall along a polyline of local points
+  function wall(line) {
+    for (let k = 0; k < line.length - 1; k++) {
+      const [x0, y0] = line[k], [x1, y1] = line[k + 1];
+      const a = add(ribToWorld(x0, y0, 1), 1), b = add(ribToWorld(x0, y0, -1), 1);
+      const c = add(ribToWorld(x1, y1, -1), 1), d = add(ribToWorld(x1, y1, 1), 1);
+      quad(a, b, c, d);
+    }
+  }
+  const range = (a, b, n) => Array.from({ length: n + 1 }, (_, i) => a + (b - a) * i / n);
+  const { SLOT_X0: s0, SLOT_X1: s1, SLOT_Y: sy } = RIB;
+  const inner = y => profileAt(y)[0], outer = y => profileAt(y)[1];
+
+  // below the slot top: inner prong and outer part
+  const yLow = range(0, sy, 16);
+  const A = patch(yLow, inner, () => s0, 3);
+  const B = patch(yLow, () => s1, outer, 6);
+  // above: full width, columns split at the slot edges' share of the width
+  const [i0, o0] = profileAt(sy);
+  const f0 = (s0 - i0) / (o0 - i0), f1 = (s1 - i0) / (o0 - i0);
+  const yHigh = range(sy, RIB.L, 90);
+  const split = (y, f) => { const [a, b] = profileAt(y); return a + (b - a) * f; };
+  const C1 = patch(yHigh, inner, y => split(y, f0), 3);
+  const C2 = patch(yHigh, y => split(y, f0), y => split(y, f1), 2);
+  const C3 = patch(yHigh, y => split(y, f1), outer, 6);
+  [A, B, C1, C2, C3].forEach(faces);
+
+  const col = (P, j) => P.map(r => r[j]);
+  const last = P => P[0].length - 1;
+  wall(col(A, 0).concat(col(C1, 0).slice(1)));                  // inner (filter) edge
+  wall(col(B, last(B)).concat(col(C3, last(C3)).slice(1)));     // outer edge
+  wall(A[0]); wall(B[0]);                                       // base
+  wall(col(A, last(A))); wall(col(B, 0));                       // slot sides
+  wall(C2[0]);                                                  // slot top
+  return { pos, edge, idx };
+}
+
+/* ============================================================================
+   Resin shaders
+   Filter pass: what's behind a rib is multiplied by its tint (order-independent,
+   so overlapping ribs mix like real coloured resin). Longer light paths at grazing
+   angles and through the moulded edges give the deep, saturated rims.
+   Gloss pass: Fresnel-weighted reflections of a few studio softboxes, added on top.
+   Reflection is taken out of the transmitted light, so ribs stay coloured, not milky.
+   ========================================================================== */
+const COMMON_VERT = `
+  attribute float aEdge;
+  varying vec3 vWN; varying vec3 vWP; varying float vE;
+  void main() {
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWP = wp.xyz;
+    vWN = normalize(mat3(modelMatrix) * normal);
+    vE = aEdge;
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }`;
+const FRESNEL = `
+  float fresnel(float c) { return 0.045 + 0.955 * pow(1.0 - c, 5.0); }`;
+const FILTER_FRAG = `
+  uniform vec3 uTint; uniform float uFade; uniform float uEdge;
+  varying vec3 vWN; varying vec3 vWP; varying float vE;
+  ${FRESNEL}
+  void main() {
+    vec3 n = normalize(vWN); vec3 v = normalize(cameraPosition - vWP);
+    float c = abs(dot(n, v));
+    float path = mix(1.0, uEdge, vE) / max(c, 0.2);
+    vec3 T = pow(max(uTint, vec3(0.002)), vec3(0.5 * path)) * (1.0 - 0.6 * fresnel(c));
+    gl_FragColor = vec4(mix(vec3(1.0), T, uFade), 1.0);
+  }`;
+const SHINE_FRAG = `
+  uniform vec3 uTint; uniform float uScatter; uniform float uFade; uniform float uHover;
+  varying vec3 vWN; varying vec3 vWP; varying float vE;
+  ${FRESNEL}
+  float box(float x, float a, float b, float soft) { return smoothstep(a - soft, a, x) * (1.0 - smoothstep(b, b + soft, x)); }
+  vec3 studio(vec3 r) {
+    float az = atan(r.x, r.z);
+    float key   = box(az, 0.55, 1.15, 0.12) * box(r.y, -0.05, 0.75, 0.12);    // big softbox, front right
+    float strip = box(az, -1.45, -1.25, 0.05) * box(r.y, -0.30, 0.85, 0.10);  // tall strip, left
+    float top   = pow(max(r.y, 0.0), 8.0);                                     // overhead
+    return vec3(key * 1.9 + strip * 1.5 + top * 0.8 + 0.015);
+  }
+  void main() {
+    vec3 n = normalize(vWN); vec3 v = normalize(cameraPosition - vWP);
+    if (dot(n, v) < 0.0) n = -n;
+    float c = clamp(dot(n, v), 0.0, 1.0);
+    vec3 spec = studio(reflect(-v, n)) * fresnel(c) * 0.75;
+    float lambert = 0.35 + 0.65 * max(dot(n, normalize(vec3(0.4, 0.8, 0.5))), 0.0);
+    vec3 glow = uTint * (uScatter * lambert + 0.22 * uHover);
+    gl_FragColor = vec4((spec + glow) * uFade, 1.0);
+  }`;
+
+function makeRibMaterials(tint, scatter, edge) {
+  const tintU = { value: new THREE.Vector3(...tint) };
+  const fadeU = { value: 0 };
+  const filter = new THREE.ShaderMaterial({
+    uniforms: { uTint: tintU, uFade: fadeU, uEdge: { value: edge } },
+    vertexShader: COMMON_VERT, fragmentShader: FILTER_FRAG,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    blending: THREE.CustomBlending, blendEquation: THREE.AddEquation,
+    blendSrc: THREE.DstColorFactor, blendDst: THREE.ZeroFactor,
+  });
+  const shine = new THREE.ShaderMaterial({
+    uniforms: { uTint: tintU, uFade: fadeU, uScatter: { value: scatter }, uHover: { value: 0 } },
+    vertexShader: COMMON_VERT, fragmentShader: SHINE_FRAG,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    blending: THREE.CustomBlending, blendEquation: THREE.AddEquation,
+    blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
+  });
+  return { filter, shine };
+}
+
+/* ============================================================================
+   Scene
+   ========================================================================== */
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+stage.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--mist').trim() || '#E4E8E5');
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd4d8d5, 0.6));
+const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(6, 14, 10); scene.add(key);
+
+const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 500);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.07;
+controls.minPolarAngle = 0.12; controls.maxPolarAngle = Math.PI * 0.62;
+controls.minDistance = 14; controls.maxDistance = 60; controls.enablePan = false;
+function resetView() {
+  const aspect = stage.clientWidth / Math.max(1, stage.clientHeight);
+  const dist = aspect < 1 ? 30 / Math.max(aspect, 0.55) : 30;
+  camera.position.set(0, 7.2 * dist / 30, dist);
+  controls.target.set(0, 5.2, 0);
+  controls.update();
+}
+
+// contact shadow
+{
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d'); const grad = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grad.addColorStop(0, 'rgba(20,30,25,0.5)'); grad.addColorStop(0.4, 'rgba(20,30,25,0.2)'); grad.addColorStop(1, 'rgba(20,30,25,0)');
+  g.fillStyle = grad; g.fillRect(0, 0, 256, 256);
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(14, 14),
+    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, opacity: 0.35, toneMapped: false }));
+  shadow.rotation.x = -Math.PI / 2; shadow.position.y = -0.47; shadow.renderOrder = 0;
+  scene.add(shadow);
+}
+
+// ring + holder (polypropylene), modelled on Hario's parts drawing
+const ringMat = new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0, envMapIntensity: 0.55, side: THREE.DoubleSide });
+const holderMat = new THREE.MeshStandardMaterial({ roughness: 0.42, metalness: 0, envMapIntensity: 0.6, side: THREE.DoubleSide });
+const lathe = (pts, seg = 96, phiStart = 0, phiLength = Math.PI * 2) =>
+  new THREE.LatheGeometry(pts.map(([r, h]) => new THREE.Vector2(r, h)), seg, phiStart, phiLength);
+
+// Ring: a thin-walled cup. Narrow spout, then a cone at the ribs' lean whose upper
+// part is split by 12 vertical slots; the ribs' forks clip onto it.
+scene.add(new THREE.Mesh(lathe([
+  [1.33, -0.45], [1.47, -0.45], [1.49, -0.41], [1.49, 0.6], [1.47, 0.64], [1.76, 1.3],
+  [1.62, 1.3], [1.33, 0.64], [1.31, 0.6], [1.31, -0.41], [1.33, -0.45],
+]), ringMat));
+const CROWN = [[1.76, 1.3], [2.47, 2.89], [2.53, 2.92], [2.54, 2.98], [2.47, 3.02], [2.36, 2.99], [1.62, 1.3]];
+const SLOT = 9 * D2R;                  // slot width, as an angle
+const SLOT_CENTER = 0;                 // centred on each rib
+const capShape = new THREE.Shape(CROWN.map(([r, h]) => new THREE.Vector2(r, h)));
+const capGeo = new THREE.ShapeGeometry(capShape);
+for (let i = 0; i < N; i++) {
+  const a0 = (i / N) * Math.PI * 2 + SLOT_CENTER + SLOT / 2;
+  const len = (Math.PI * 2) / N - SLOT;
+  scene.add(new THREE.Mesh(lathe(CROWN, 10, a0, len), ringMat));
+  for (const phi of [a0, a0 + len]) {            // close the slot faces
+    const cap = new THREE.Mesh(capGeo, ringMat);
+    cap.rotation.y = phi - Math.PI / 2;
+    scene.add(cap);
+  }
+}
+
+// Holder: a flat, slightly egg-shaped plate. Its centre opening has 12 fingers that
+// rest on the ring's cone, with gaps between them for the ribs to pass through.
+{
+  const outline = new THREE.Shape();
+  const M = 160;
+  for (let k = 0; k <= M; k++) {
+    const t = (k / M) * Math.PI * 2;
+    const x = 5.8 * Math.cos(t) + 0.3;
+    const z = 4.5 * Math.sin(t) * (1 - 0.16 * Math.cos(t));   // narrower towards +x
+    k === 0 ? outline.moveTo(x, -z) : outline.lineTo(x, -z);
+  }
+  const hole = new THREE.Path();
+  const H = 720, R_IN = 1.93, R_OUT = 3.5, GAP = 5.5 * D2R, GAP_CENTER = 0.75 * D2R, SOFT = 1.5 * D2R;
+  for (let k = 0; k <= H; k++) {
+    const phi = (k / H) * Math.PI * 2;
+    const step = (Math.PI * 2) / N;
+    let d = (((phi - GAP_CENTER) % step) + step) % step; if (d > step / 2) d -= step;
+    const g = 1 - smooth01(GAP - SOFT, GAP + SOFT, Math.abs(d));   // 1 inside a rib gap
+    const r = R_IN + (R_OUT - R_IN) * g;
+    const x = r * Math.sin(phi), y = -r * Math.cos(phi);
+    k === 0 ? hole.moveTo(x, y) : hole.lineTo(x, y);
+  }
+  outline.holes.push(hole);
+  const plateGeo = new THREE.ExtrudeGeometry(outline, {
+    depth: 0.12, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 3, curveSegments: 1,
+  });
+  const plate = new THREE.Mesh(plateGeo, holderMat);
+  plate.rotation.x = -Math.PI / 2;
+  plate.position.y = 1.42;
+  scene.add(plate);
+}
+function applyRing() {
+  ringMat.color.setHex(RINGS[state.ring].ring);
+  holderMat.color.setHex(RINGS[state.ring].holder);
+}
+
+// ribs
+const ribGeo = new THREE.BufferGeometry();
+{
+  const { pos, edge, idx } = buildRibArrays();
+  ribGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  ribGeo.setAttribute('aEdge', new THREE.Float32BufferAttribute(edge, 1));
+  ribGeo.setIndex(idx);
+  ribGeo.computeVertexNormals();
+}
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const ribs = [];
+for (let i = 0; i < N; i++) {
+  const col = BY_ID[state.ribs[i]];
+  const m = makeRibMaterials(col.tint, col.scatter, col.edge);
+  const filter = new THREE.Mesh(ribGeo, m.filter); filter.rotation.y = (i / N) * Math.PI * 2; filter.renderOrder = 1;
+  const shine = new THREE.Mesh(ribGeo, m.shine); shine.rotation.y = filter.rotation.y; shine.renderOrder = 2;
+  filter.userData.index = i;
+  scene.add(filter, shine);
+  ribs.push({ filter, shine, mats: m, target: new THREE.Vector3(...col.tint), targetScatter: col.scatter, targetEdge: col.edge, hover: 0 });
+}
+function applyRibs(instant = false) {
+  ribs.forEach((r, i) => {
+    const col = BY_ID[state.ribs[i]];
+    r.target.set(...col.tint); r.targetScatter = col.scatter; r.targetEdge = col.edge;
+    if (instant || reduceMotion) {
+      r.mats.filter.uniforms.uTint.value.copy(r.target);
+      r.mats.filter.uniforms.uEdge.value = col.edge;
+      r.mats.shine.uniforms.uScatter.value = col.scatter;
+    }
+  });
+}
+
+// pointer: hover + tap-to-paint on the 3D ribs
+const raycaster = new THREE.Raycaster(); const ndc = new THREE.Vector2();
+let down = null;
+function ribAt(e) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hit = raycaster.intersectObjects(ribs.map(r => r.filter), false)[0];
+  return hit ? hit.object.userData.index : -1;
+}
+renderer.domElement.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6) {
+    const i = ribAt(e); if (i >= 0) paint(i);
+  }
+  down = null;
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  if (e.buttons) return;
+  const i = ribAt(e);
+  renderer.domElement.classList.toggle('over-rib', i >= 0);
+  setHover(i);
+});
+renderer.domElement.addEventListener('pointerleave', () => setHover(-1));
+
+// loop
+const clock = new THREE.Clock(); const start = performance.now();
+let lastAz = null;
+function frame() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const k = 1 - Math.exp(-dt * 12);
+  const t = performance.now() - start;
+  ribs.forEach((r, i) => {
+    const u = r.mats.filter.uniforms; const s = r.mats.shine.uniforms;
+    u.uTint.value.lerp(r.target, k);
+    s.uScatter.value += (r.targetScatter - s.uScatter.value) * k;
+    u.uEdge.value += (r.targetEdge - u.uEdge.value) * k;
+    const h = state.hover === i ? 1 : 0; s.uHover.value += (h - s.uHover.value) * k;
+    // load-in: ribs appear one after another around the ring
+    const f = reduceMotion ? 1 : Math.min(1, Math.max(0, (t - 200 - i * 70) / 600));
+    u.uFade.value = 1 - Math.pow(1 - f, 3);
+  });
+  controls.update();
+  const az = controls.getAzimuthalAngle();
+  if (lastAz === null || Math.abs(az - lastAz) > 0.002) { lastAz = az; rotateDial(az); }
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  renderer.domElement.style.width = '100%'; renderer.domElement.style.height = '100%';
+  camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+
+/* ============================================================================
+   Panel UI
+   ========================================================================== */
+const $ = id => document.getElementById(id);
+const SVGNS = 'http://www.w3.org/2000/svg';
+// Dial petal = a rib seen from above: straight inside the ring, then curving away,
+// matching the ribs' bend (world cm scaled to dial units).
+const PETAL = (() => {
+  const U = 21.5, r0 = RIB.BEND_R0 * U, k = RIB.BEND_K / U;
+  const pts = [], R1 = 34, R2 = 130, M = 28;
+  const centre = r => [k * Math.max(0, r - r0) ** 2, r];
+  const left = [], right = [];
+  for (let i = 0; i <= M; i++) {
+    const r = R1 + (R2 - R1) * i / M;
+    const [cx, cy] = centre(r), [nx0, ny0] = centre(r + 0.5);
+    let tx = nx0 - cx, ty = ny0 - cy; const tl = Math.hypot(tx, ty); tx /= tl; ty /= tl;
+    const hw = 2 + 7.5 * Math.pow(Math.sin(Math.PI * Math.min(1, (r - R1) / (R2 - R1 + 8))), 0.7);
+    left.push([cx - ty * hw, cy + tx * hw]); right.push([cx + ty * hw, cy - tx * hw]);
+  }
+  const ring = left.concat(right.reverse());
+  return 'M' + ring.map(([x, y]) => x.toFixed(1) + ' ' + y.toFixed(1)).join(' L') + ' Z';
+})();
+const shade = (hex, f) => {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = s => Math.round(((n >> s) & 255) * f).toString(16).padStart(2, '0');
+  return '#' + ch(16) + ch(8) + ch(0);
+};
+
+// dial: the 12 ribs seen from above, front at the bottom; turns with the camera
+const dial = $('dial');
+const dialRot = document.createElementNS(SVGNS, 'g'); dialRot.setAttribute('class', 'rot');
+const ringDot = document.createElementNS(SVGNS, 'circle');
+ringDot.setAttribute('r', '30'); ringDot.setAttribute('class', 'ring-dot');
+ringDot.setAttribute('stroke', 'rgba(0,0,0,0.14)'); ringDot.setAttribute('stroke-width', '1.2');
+const petals = [];
+for (let i = 0; i < N; i++) {
+  const g = document.createElementNS(SVGNS, 'g');
+  g.setAttribute('transform', `rotate(${-(i / N) * 360})`);
+  const p = document.createElementNS(SVGNS, 'path');
+  p.setAttribute('d', PETAL); p.setAttribute('class', 'petal');
+  p.setAttribute('tabindex', '0'); p.setAttribute('role', 'button');
+  p.addEventListener('click', () => paint(i));
+  p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); paint(i); } });
+  p.addEventListener('pointerenter', () => setHover(i));
+  p.addEventListener('pointerleave', () => setHover(-1));
+  p.addEventListener('focus', () => setHover(i));
+  p.addEventListener('blur', () => setHover(-1));
+  g.appendChild(p); dialRot.appendChild(g); petals.push(p);
+}
+dial.append(dialRot, ringDot);
+const front = document.createElementNS(SVGNS, 'text');
+front.setAttribute('class', 'front'); front.setAttribute('text-anchor', 'middle');
+front.setAttribute('y', '163'); // below the dial: the side of the dripper facing you
+front.textContent = 'front';
+dial.appendChild(front);
+function rotateDial(az) { dialRot.setAttribute('transform', `rotate(${(az * 180) / Math.PI})`); }
+
+function miniDial(ribIds, ring) {
+  const svg = document.createElementNS(SVGNS, 'svg'); svg.setAttribute('viewBox', '-140 -140 280 280'); svg.setAttribute('aria-hidden', 'true');
+  ribIds.forEach((id, i) => {
+    const p = document.createElementNS(SVGNS, 'path'); p.setAttribute('d', PETAL);
+    p.setAttribute('transform', `rotate(${-(i / N) * 360})`);
+    p.setAttribute('fill', BY_ID[id].hex); p.setAttribute('fill-opacity', '0.8');
+    svg.appendChild(p);
+  });
+  const c = document.createElementNS(SVGNS, 'circle'); c.setAttribute('r', '30'); c.setAttribute('fill', RINGS[ring || state.ring].swatch);
+  c.setAttribute('stroke', 'rgba(0,0,0,0.12)');
+  svg.appendChild(c);
+  return svg;
+}
+
+function renderSwatches() {
+  const box = $('swatches'); box.innerHTML = '';
+  COLORS.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'swatch'; b.style.setProperty('--c', c.hex);
+    b.setAttribute('aria-pressed', String(state.brush === c.id));
+    b.setAttribute('aria-label', c.name); b.title = c.name;
+    b.addEventListener('click', () => { state.brush = c.id; renderSwatches(); renderStatus(); });
+    box.appendChild(b);
+  });
+  $('alternate').textContent = 'Alternate with ' + BY_ID[state.brush].name.replace('Clear ', '').toLowerCase();
+}
+function renderWays() {
+  const box = $('ways'); box.innerHTML = '';
+  WAYS.forEach(w => {
+    const b = document.createElement('button'); b.className = 'way';
+    b.setAttribute('aria-pressed', String(wayMatches(w)));
+    b.appendChild(miniDial(w.ribs, w.ring));
+    const s = document.createElement('span'); s.textContent = w.name; b.appendChild(s);
+    b.addEventListener('click', () => { if (w.ring) { state.ring = w.ring; applyRing(); } setRibs(w.ribs.slice(), w.name); });
+    box.appendChild(b);
+  });
+}
+function renderRing() {
+  const box = $('ringSeg'); box.innerHTML = '';
+  Object.entries(RINGS).forEach(([id, r]) => {
+    const b = document.createElement('button');
+    b.setAttribute('aria-pressed', String(state.ring === id));
+    b.innerHTML = `<i style="background:${r.swatch}"></i>${r.label}`;
+    b.addEventListener('click', () => { state.ring = id; applyRing(); renderAll(); writeHash(); });
+    box.appendChild(b);
+  });
+}
+function renderDial() {
+  petals.forEach((p, i) => {
+    const c = BY_ID[state.ribs[i]];
+    p.setAttribute('fill', c.hex); p.setAttribute('fill-opacity', '0.8');
+    p.setAttribute('stroke', shade(c.hex, 0.72));
+    p.setAttribute('aria-label', `Rib ${i + 1}, ${c.name}. Paint with ${BY_ID[state.brush].name}`);
+    p.classList.toggle('hot', state.hover === i);
+  });
+  ringDot.setAttribute('fill', RINGS[state.ring].swatch);
+}
+function renderStatus() {
+  const s = $('status');
+  if (state.hover >= 0) {
+    s.innerHTML = `<b>Rib ${state.hover + 1}</b> is ${BY_ID[state.ribs[state.hover]].name}`;
+  } else {
+    s.innerHTML = `Painting with <b>${BY_ID[state.brush].name}</b>`;
+  }
+}
+function renderOrder() {
+  const rows = COLORS.map(c => ({ c, n: state.ribs.filter(id => id === c.id).length })).filter(r => r.n > 0);
+  let sets = 0;
+  $('order').innerHTML = rows.map(({ c, n }) => {
+    const packs = Math.ceil(n / 6); sets += packs; const spare = packs * 6 - n;
+    return `<tr><td class="dot"><i style="background:${c.hex}"></i></td>
+      <td>${c.name}${c.code ? `<small>${c.code}</small>` : ''}</td>
+      <td class="num">${packs} ${packs === 1 ? 'set' : 'sets'}<small>${n} used${spare ? `, ${spare} spare` : ''}</small></td></tr>`;
+  }).join('') + `<tr><td class="dot"><i style="background:${RINGS[state.ring].swatch}"></i></td>
+      <td>Ring and holder<small>${RINGS[state.ring].label}</small></td><td class="num">1</td></tr>`;
+  $('total').textContent = `${sets} rib ${sets === 1 ? 'set' : 'sets'} in total. Codes are Hario's rib set numbers.`;
+}
+function renderTitle() {
+  const h = $('wayName');
+  if (document.activeElement !== h && h.textContent !== state.name) h.textContent = state.name;
+  document.title = `${state.name} | Suiren colour studio`;
+}
+function renderAll() { renderSwatches(); renderWays(); renderRing(); renderDial(); renderStatus(); renderOrder(); renderTitle(); }
+
+function setHover(i) {
+  if (state.hover === i) return;
+  state.hover = i; renderDial(); renderStatus();
+}
+function setRibs(next, name) {
+  state.ribs = next;
+  if (name) { state.name = name; state.customName = false; }
+  else if (!state.customName) { const m = WAYS.find(wayMatches); state.name = m ? m.name : 'Your colourway'; }
+  applyRibs(); renderAll(); writeHash();
+}
+
+// editable colourway name
+{
+  const h = $('wayName');
+  const MAX = 48;
+  h.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); h.blur(); } });
+  h.addEventListener('paste', e => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\s+/g, ' ');
+    document.execCommand('insertText', false, text);
+  });
+  h.addEventListener('input', () => {
+    let t = h.textContent.replace(/\s+/g, ' ');
+    if (t.length > MAX) { t = t.slice(0, MAX); h.textContent = t; placeCaretAtEnd(h); }
+    state.name = t.trim() || DEFAULT_NAME; state.customName = true;
+    document.title = `${state.name} | Suiren colour studio`;
+  });
+  h.addEventListener('focus', () => { const r = document.createRange(); r.selectNodeContents(h); const s = getSelection(); s.removeAllRanges(); s.addRange(r); });
+  h.addEventListener('blur', () => { h.textContent = state.name; writeHash(); renderWays(); });
+  function placeCaretAtEnd(el) { const r = document.createRange(); r.selectNodeContents(el); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+}
+function paint(i) {
+  if (state.ribs[i] === state.brush) return;
+  const next = state.ribs.slice(); next[i] = state.brush; setRibs(next);
+}
+
+$('fillAll').addEventListener('click', () => setRibs(pattern([state.brush])));
+$('alternate').addEventListener('click', () => {
+  const other = state.ribs.find(id => id !== state.brush) || 'TW';
+  setRibs(Array.from({ length: N }, (_, i) => (i % 2 ? other : state.brush)));
+});
+$('shuffle').addEventListener('click', () => {
+  const pool = [...new Set(state.ribs)].length > 1 ? [...new Set(state.ribs)] : COLORS.map(c => c.id);
+  setRibs(Array.from({ length: N }, () => pool[Math.floor(Math.random() * pool.length)]));
+});
+$('resetView').addEventListener('click', resetView);
+
+const toastEl = $('toast'); let toastT;
+function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('show'), 2200); }
+$('saveImg').addEventListener('click', async () => {
+  renderer.render(scene, camera);
+  const src = renderer.domElement;
+  const out = document.createElement('canvas'); out.width = src.width; out.height = src.height;
+  const g = out.getContext('2d');
+  g.drawImage(src, 0, 0);
+  try { await document.fonts.ready; } catch (e) {}
+  const cs = getComputedStyle(document.documentElement);
+  const pad = Math.round(out.height * 0.05);
+  let size = Math.round(out.height * 0.075);
+  g.fillStyle = cs.getPropertyValue('--ink').trim() || '#1D2420';
+  g.textBaseline = 'alphabetic';
+  do { g.font = `600 ${size}px 'Bricolage Grotesque', sans-serif`; size -= 2; }
+  while (g.measureText(state.name).width > out.width - pad * 2 && size > 12);
+  g.fillText(state.name, pad, out.height - pad - Math.round(out.height * 0.035));
+  g.fillStyle = cs.getPropertyValue('--reed').trim() || '#5C6660';
+  g.font = `500 ${Math.round(out.height * 0.022)}px 'Zen Kaku Gothic New', sans-serif`;
+  g.fillText('Hario V60 Dripper Suiren', pad, out.height - pad);
+  out.toBlob(blob => {
+    if (!blob) { toast('Could not save the image'); return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `suiren-${state.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast('Image saved');
+  });
+});
+$('copyLink').addEventListener('click', async () => {
+  writeHash();
+  try { await navigator.clipboard.writeText(location.href); toast('Link copied'); }
+  catch (e) { toast('Copy the address bar to share this colourway'); }
+});
+
+applyRing(); applyRibs(true); renderAll(); resize(); resetView(); writeHash();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
